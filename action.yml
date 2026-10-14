@@ -1,0 +1,42 @@
+name: 'FlutCheck'
+description: 'Validates native Android AAR artifacts against headless Flutter build environments.'
+author: 'TacitWorks'
+branding:
+  icon: 'package'
+  color: 'blue'
+
+inputs:
+  aar-path:
+    description: 'The relative path to your compiled native Android AAR file.'
+    required: true
+    default: 'build/outputs/aar/sdk-release.aar'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Create Headless Flutter Test Harness
+      shell: bash
+      run: |
+        echo "🚀 Initializing headless Flutter validation environment..."
+        flutter create --platforms=android headless_harness
+        cd headless_harness
+        
+        echo "📦 Copying native AAR into testing sandbox..."
+        mkdir -p android/app/libs
+        cp ../${{ inputs.aar-path }} android/app/libs/flutcheck-target.aar
+
+    - name: Inject AAR Configurations into Gradle
+      shell: bash
+      run: |
+        cd headless_harness/android/app
+        # Perform surgery on Flutter's generated build.gradle to implement the AAR
+        sed -i '/dependencies {/a \    implementation(files("libs/flutcheck-target.aar"))' build.gradle
+        sed -i '/repositories {/a \        flatDir { dirs "libs" }' build.gradle
+
+    - name: Execute Flutter Build Smoke Test
+      shell: bash
+      run: |
+        cd headless_harness
+        echo "⚡ Triggering Flutter Android build execution..."
+        flutter build apk --debug
+        echo "🎉 Success! The native AAR compiled cleanly in the Flutter ecosystem."
